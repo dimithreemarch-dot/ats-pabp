@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Asesmen PAI & Budi Pekerti - Bab 1, 2 & 3</title>
+    
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; user-select: none; -webkit-user-select: none; }
+        body { background-color: #f4f6f9; margin: 0; padding: 15px; color: #333; }
+        .container { max-width: 650px; margin: auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h2 { text-align: center; color: #1b5e20; margin-top: 0; }
+        .sub-header { text-align: center; font-size: 14px; color: #666; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 5px; }
+        input[type="text"], select, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 15px; }
+        textarea { resize: vertical; min-height: 80px; }
+        .btn { width: 100%; padding: 12px; background: #2e7d32; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn:disabled { background: #ccc; }
+        .header-status { position: sticky; top: 0; z-index: 100; display: flex; justify-content: space-between; background: #e8f5e9; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; font-weight: bold; color: #1b5e20; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .soal-card { margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .soal-text { font-size: 15px; line-height: 1.6; margin-bottom: 12px; }
+        .badge { display: inline-block; background: #e0e0e0; color: #333; font-size: 11px; padding: 3px 8px; border-radius: 4px; margin-bottom: 6px; font-weight: bold; }
+        .opsi-list { list-style: none; padding: 0; margin: 0; }
+        .opsi-item { margin-bottom: 8px; }
+        .opsi-label { display: flex; align-items: flex-start; padding: 10px; border: 1px solid #ddd; border-radius: 6px; cursor: pointer; transition: 0.2s; font-size: 14px; line-height: 1.4; }
+        .opsi-label:hover { background: #f1f8e9; }
+        .opsi-label input { margin-right: 12px; margin-top: 2px; transform: scale(1.2); }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 25px; border-radius: 10px; text-align: center; max-width: 85%; }
+        .alert-text { color: #d93025; font-size: 18px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Halaman Register / Data Diri -->
+    <div id="page-register">
+        <h2>Asesmen PAI & Budi Pekerti</h2>
+        <p class="sub-header">Materi: Bab 1, Bab 2 & Bab 3</p>
+        <div class="form-group">
+            <label>Nama Lengkap Siswa:</label>
+            <input type="text" id="inputNama" placeholder="Masukkan nama lengkap..." required>
+        </div>
+        <div class="form-group">
+            <label>Kelas:</label>
+            <input type="text" id="inputKelas" placeholder="Contoh: IX A / IX B" required>
+        </div>
+        <button class="btn" type="button" onclick="mulaiUjian()">Mulai Kerjakan Ujian</button>
+    </div>
+
+    <!-- Halaman Lembar Ujian -->
+    <div id="page-ujian" style="display: none;">
+        <div class="header-status">
+            <div>⏱️ Sisa: <span id="timer">60:00</span></div>
+            <div>⚠️ Pelanggaran: <span id="violation-count" style="color:red;">0/3</span></div>
+        </div>
+
+        <form id="quizForm">
+            <div id="soal-container"></div>
+            <button type="button" class="btn" id="btnSubmit" onclick="konfirmasiSelesai()">Selesaikan & Kirim Jawaban</button>
+        </form>
+    </div>
+
+    <!-- Halaman Selesai / Loading -->
+    <div id="page-selesai" style="display: none; text-align: center;">
+        <h2 id="status-title">Mengirim Jawaban...</h2>
+        <p id="status-desc">Mohon tunggu sebentar, nilai dan lembar jawaban Anda sedang dikirim ke server database.</p>
+    </div>
+</div>
+
+<!-- Modal Peringatan Pelanggaran -->
+<div id="warningModal" class="modal">
+    <div class="modal-content">
+        <p class="alert-text">⚠️ PERINGATAN KECURANGAN!</p>
+        <p id="modalMsg">Anda terdeteksi meninggalkan halaman ujian/pindah tab!</p>
+        <button class="btn" type="button" onclick="tutupModal()">Saya Mengerti</button>
+    </div>
+</div>
+
+<script>
+    // URL Web App Google Apps Script Anda
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNYQr2zir-HisZu5e8S8p9QfxvPbDziQqPIvfvUm8Uy9FukcyrXRqBHao0czVIxW2QuQ/exec";
+
+    // Bank Soal Berdasarkan Dokumen
+    const bankSoal = [
+        // PILIHAN GANDA (1 JAWABAN)
+        { no: 1, tipe: "PG", teks: "Berdasarkan Q.S. Al-Mujadilah [58]: 11, Allah SWT berjanji akan meninggikan derajat orang-orang yang ...", opsi: ["A. Beriman dan beramal saleh", "B. Beriman dan memiliki ilmu pengetahuan", "C. Rajin beribadah dan bersedekah", "D. Bertakwa dan bertawakal"], kunci: "B" },
+        { no: 2, tipe: "PG", teks: "Dalam Q.S. Az-Zumar [39]: 9, Allah SWT memberikan pertanyaan retoris yang menegaskan perbedaan mendasar antara ...", opsi: ["A. Orang yang berharta dan orang yang miskin", "B. Orang yang mengetahui (berilmu) dan orang yang tidak mengetahui", "C. Orang yang jujur dan orang yang dusta", "D. Orang yang berkuasa dan rakyat biasa"], kunci: "B" },
+        { no: 3, tipe: "PG", teks: "Rasulullah SAW bersabda: \"Barang siapa yang menempuh suatu jalan untuk menuntut ilmu, maka Allah akan memudahkan baginya jalan menuju ...\" (H.R. Muslim)", opsi: ["A. Kekayaan dunia", "B. Surga", "C. Kehormatan", "D. Kekuasaan"], kunci: "B" },
+        { no: 4, tipe: "PG", teks: "Perhatikan hukum bacaan Tajwid berikut! Apabila terdapat Nun Sukun (نْ) atau Tanwin bertemu dengan huruf Ra (ر) atau Lam (ل), maka hukum bacaannya adalah ...", opsi: ["A. Idgham Bigunnah", "B. Idgham Bilagunnah", "C. Izhar Halqi", "D. Iqlab"], kunci: "B" },
+        { no: 5, tipe: "PG", teks: "Ibnu Sina (Avicenna) dikenal sebagai \"Bapak Kedokteran Modern\" yang karya terbesarnya <i>Al-Qānūn fī aṭ-Ṭibb</i> menjadi rujukan utama di Eropa selama berabad-abad. Nilai teladan utama yang dapat diambil oleh seorang siswa dari sosok Ibnu Sina adalah ...", opsi: ["A. Hanya mempelajari ilmu agama dan mengabaikan ilmu sains", "B. Semangat mengintegrasikan pengetahuan sains dan medis dengan nilai-nilai keimanan", "C. Mencari ilmu untuk mengejar gelar dan kekayaan materi semata", "D. Belajar hanya saat menjelang ujian sekolah"], kunci: "B" },
+        { no: 6, tipe: "PG", teks: "Seorang siswa di kelas selalu memberikan kelapangan tempat duduk dan menyambut baik teman yang datang terlambat untuk belajar bersama dalam kelompok. Sikap siswa tersebut merupakan contoh pengamalan langsung dari ayat ...", opsi: ["A. Q.S. Al-Mujadilah [58]: 11 (yafsahi-llāhu lakum)", "B. Q.S. Az-Zumar [39]: 9 (hal yastawī-llażīna ya'lamūn)", "C. Q.S. Al-Baqarah [2]: 255", "D. Q.S. Ali 'Imran [3]: 190"], kunci: "A" },
+        { no: 7, tipe: "PG", teks: "Dua siswa menyikapi perkembangan teknologi AI (Kecerdasan Buatan). Andi menggunakan AI untuk membuatkan tugas sekolah secara instan tanpa mau mempelajari prosesnya, sedangkan Budi memanfaatkan AI sebagai mitra diskusi untuk memperdalam pemahaman materi. Penilaian yang paling tepat dari sudut pandang semangat menuntut ilmu Islami adalah ...", opsi: ["A. Andi lebih cerdas karena berhasil menghemat waktu dan tenaga", "B. Budi mencerminkan hakikat penuntut ilmu sejati karena mengutamakan pemahaman intelektual daripada sekadar hasil akhir", "C. Kedua perilaku tersebut sama saja karena yang terpenting tugas selesai tepat waktu", "D. Budi keliru karena seharusnya tidak perlu menggunakan teknologi modern dalam belajar"], kunci: "B" },
+
+        // PILIHAN GANDA KOMPLEKS (LEBIH DARI SATU JAWABAN)
+        { no: 8, tipe: "PGK", teks: "Manakah di antara tokoh ilmuwan Muslim berikut beserta karya/kontribusi terbesarnya yang BENAR? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Al-Khawarizmi — Penemu konsep Aljabar dan Angka Nol dalam Matematika", "B. Ibnu Sina — Penulis kitab kedokteran Al-Qanun fi at-Tibb", "C. Al-Biruni — Penemu teori gravitasi bumi pertama kali di Eropa", "D. Jabir bin Hayyan — Bapak Ilmu Kimia modern yang menemukan reaksi kristalisasi dan distilasi", "E. Ibnu Khaldun — Pelopor ilmu Sosiologi dan Ekonomi melalui karya Muqaddimah"], kunci: ["A", "B", "D", "E"] },
+        { no: 9, tipe: "PGK", teks: "Q.S. Al-Mujadilah [58]: 11 mengajarkan etika dalam majelis ilmu dan kehidupan sosial. Manakah nilai-nilai utama yang terkandung dalam ayat tersebut? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Perintah untuk memberikan kelapangan dan penghormatan kepada sesama dalam majelis", "B. Janji Allah mengangkat derajat orang yang beriman dan berilmu pengetahuan", "C. Larangan menuntut ilmu selain ilmu syariat dan agama", "D. Keharusan untuk mentaati pemimpin majelis jika diminta berdiri/berpindah tempat", "E. Penegasan bahwa kekayaan harta lebih mulia daripada ilmu pengetahuan"], kunci: ["A", "B", "D"] },
+        { no: 10, tipe: "PGK", teks: "Perhatikan frasa ayat berikut: \"Yarfa'illāhullażīna āmanū minkum wallażīna ūtul-'ilma darajāt\". Pernyataan yang SESUAI dengan makna frasa tersebut adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Keimanan tanpa ilmu akan rapuh, sedangkan ilmu tanpa iman akan tersesat", "B. Derajat kemuliaan di sisi Allah diukur dari kombinasi iman dan keilmuan seseorang", "C. Kedudukan tinggi hanya berlaku untuk kehidupan dunia semata", "D. Menuntut ilmu merupakan sarana untuk meninggikan harkat dan martabat manusia", "E. Orang berilmu pasti masuk surga tanpa perlu beramal saleh"], kunci: ["A", "B", "D"] },
+        { no: 11, tipe: "PGK", teks: "Seorang pelajar muslim yang meneladani keutamaan menuntut ilmu sesuai hadits Nabi SAW akan menunjukkan kebiasaan hidup ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Pantang menyerah dan gigih dalam mencari kebenaran ilmu pengetahuan", "B. Mengamalkan ilmu yang dimiliki untuk kemaslahatan masyarakat banyak", "C. Bersikap sombong dan memandang rendah orang yang tidak berpendidikan", "D. Menghormati guru dan para ulama yang mengajarkan kebaikan", "E. Menyimpan ilmu untuk diri sendiri agar tidak tersaingi oleh teman"], kunci: ["A", "B", "D"] },
+
+        // ISIAN SINGKAT
+        { no: 12, tipe: "ISIAN", teks: "Gelar terhormat yang diberikan Al-Qur'an (Q.S. Az-Zumar: 9) bagi orang-orang berilmu yang mau menggunakan akal pikirannya untuk mengambil pelajaran adalah ..." },
+        { no: 13, tipe: "ISIAN", teks: "Apabila Nun Sukun (نْ) bertemu dengan huruf Ba (ب), maka hukum bacaannya adalah ..." },
+        { no: 14, tipe: "ISIAN", teks: "Tokoh ilmuwan Muslim yang dijuluki sebagai \"Bapak Aljabar Modern\" dan penemu angka nol adalah ..." },
+
+        // PILIHAN GANDA BAB 2 (HARI AKHIR)
+        { no: 15, tipe: "PG", teks: "Secara bahasa, kata \"Kiamat\" berasal dari bahasa Arab <i>qāma - yaqūmu</i> yang berarti ...", opsi: ["A. Hancurnya alam semesta", "B. Bangkit atau berdiri", "C. Berakhirnya kehidupan", "D. Penyesalan manusia"], kunci: "B" },
+        { no: 16, tipe: "PG", teks: "Perhatikan peristiwa-peristiwa berikut:<br>1) Bencana banjir bandang<br>2) Terbitnya matahari dari arah barat<br>3) Meninggalnya seorang manusia<br>4) Munculnya Dajjal<br>Peristiwa yang termasuk ke dalam kategori Kiamat Sugra ditunjukkan oleh nomor ...", opsi: ["A. 1) dan 2)", "B. 1) dan 3)", "C. 2) dan 4)", "D. 3) dan 4)"], kunci: "B" },
+        { no: 17, tipe: "PG", teks: "Malaikat yang bertugas meniup sangkakala (sūr) pada saat dimulainya kiamat kubra dan hari kebangkitan adalah Malaikat ...", opsi: ["A. Jibril", "B. Mikail", "C. Israfil", "D. Izrail"], kunci: "C" },
+        { no: 18, tipe: "PG", teks: "Setelah manusia dibangkitkan dari alam kubur (Yaumul Ba'as), seluruh manusia akan dikumpulkan di sebuah padang yang sangat luas, datar, dan panas untuk menunggu pengadilan Allah SWT. Tempat berkumpul tersebut dinamakan ...", opsi: ["A. Yaumul Mizan", "B. Padang Mahsyar", "C. Yaumul Hisab", "D. Alam Barzakh"], kunci: "B" },
+        { no: 19, tipe: "PG", teks: "Ahmad selalu berhati-hati dalam bertindak dan bertutur kata. Ia sadar bahwa sekecil apa pun perbuatannya di dunia, baik maupun buruk, akan diperhitungkan dan ditimbang secara adil pada hari kiamat. Sikap Ahmad tersebut merupakan cerminan dari keimanan pada tahapan ...", opsi: ["A. Yaumul Ba'as dan Yaumul Jaza'", "B. Yaumul Hisab dan Yaumul Mizan", "C. Yaumul Mahsyar dan Yaumul Ba'as", "D. Yaumul Barzakh dan Yaumul Ba'as"], kunci: "B" },
+        { no: 20, tipe: "PG", teks: "Seseorang yang memiliki iman kepada Hari Akhir akan memaknai fenomena gempa bumi, tsunami, dan letusan gunung berapi sebagai ...", opsi: ["A. Peristiwa alam biasa akibat pergeseran lempeng tektonik semata", "B. Tanda bahwa kiamat kubra telah selesai dilaksanakan", "C. Peringatan/teguran dari Allah agar manusia bertaubat dan menyadari kiamat sugra", "D. Hukuman yang menandakan bahwa kesempatan beramal bagi manusia telah habis"], kunci: "C" },
+        { no: 21, tipe: "PG", teks: "Budi memanfaatkan media sosial untuk menyebarkan hoaks demi popularitas, sedangkan Doni memanfaatkannya untuk membagikan konten dakwah dan kebaikan. Penilaian yang paling tepat terhadap perilaku tersebut adalah ...", opsi: ["A. Budi telah memahami iman kepada hari akhir karena berani menanggung risiko di akhirat", "B. Doni mencerminkan kesadaran akan Yaumul Hisab, karena meyakini jejaring digital pun akan dimintai pertanggungjawaban", "C. Perilaku Budi dan Doni tidak berhubungan dengan iman kepada Hari Akhir", "D. Doni hanya mencari pujian dari orang lain di dunia"], kunci: "B" },
+
+        // PILIHAN GANDA KOMPLEKS (BAB 2)
+        { no: 22, tipe: "PGK", teks: "Manakah di antara pernyataan berikut yang merupakan tanda-tanda Kiamat Kubra (Kiamat Besar)? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Terbitnya matahari dari sebelah barat", "B. Maraknya perbuatan maksiat dan minuman keras", "C. Munculnya Dajjal dan Ya'juj Ma'juj", "D. Wafatnya para ulama dan hilangnya ilmu agama", "E. Turunnya Nabi Isa a.s. ke bumi"], kunci: ["A", "C", "E"] },
+        { no: 23, tipe: "PGK", teks: "Manakah pernyataan yang BENAR mengenai tahapan Alam Barzakh (Alam Kubur)? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Merupakan pintu gerbang atau pembatas antara alam dunia dan alam akhirat", "B. Manusia sudah mendapatkan pembalasan mutlak berupa surga dan neraka", "C. Ruh manusia akan ditanya oleh Malaikat Munkar dan Nakir", "D. Manusia dapat memohon kembali ke dunia untuk menambah amal ibadah", "E. Seseorang yang telah meninggal mendapatkan nikmat atau siksa kubur sesuai amalnya"], kunci: ["A", "C", "E"] },
+        { no: 24, tipe: "PGK", teks: "Seorang muslim yang meyakini keberadaan Yaumul Mizan (Hari Penimbangan) akan menunjukkan kebiasaan hidup ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Senantiasa menyempurnakan timbangan dan takaran dalam bertransaksi/berdagang", "B. Mengabaikan dosa-dosa kecil karena merasa pahala shalat sudah cukup", "C. Gemar memperbanyak amalan ringan yang berat di timbangan, seperti berdzikir", "D. Menghitung-hitung kebaikan diri sendiri untuk dipamerkan", "E. Berusaha menghindari perbuatan zalim sekecil apa pun kepada sesama"], kunci: ["A", "C", "E"] },
+        { no: 25, tipe: "PGK", teks: "Pernyataan yang sesuai mengenai Shirath (jembatan di atas neraka menuju surga) adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Kecepatan manusia menyeberangi Shirath tergantung pada amalnya selama hidup di dunia", "B. Shirath hanya dibentangkan untuk golongan orang-orang kafir saja", "C. Orang-orang yang beriman dan bertakwa akan mampu melewatinya dengan selamat", "D. Ketajaman dan kelicinan Shirath ditentukan oleh kekayaan materi seseorang di dunia", "E. Mereka yang berat dosa maksiatnya akan terpeleset dan jatuh ke dalam neraka"], kunci: ["A", "C", "E"] },
+        { no: 26, tipe: "PGK", teks: "Berikut ini yang termasuk fungsi dan hikmah meyakini Hari Akhir dalam kehidupan sehari-hari adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Mendorong manusia untuk bersikap optimis dan giat beramal saleh", "B. Menumbuhkan rasa takut untuk berbuat maksiat dan zalim", "C. Membuat seseorang menjadi pesimis dan enggan bekerja mengejar cita-cita duniawi", "D. Memberikan ketenangan jiwa dalam menghadapi cobaan hidup di dunia", "E. Menjadikan manusia fokus beribadah ritual saja dan mengabaikan kehidupan sosial"], kunci: ["A", "B", "D"] },
+
+        // ISIAN SINGKAT (BAB 2)
+        { no: 27, tipe: "ISIAN", teks: "Gambaran kondisi manusia di Padang Mahsyar sangat menegangkan. Tingkat kepanasan dan penderitaan manusia pada saat itu sangat ditentukan oleh ..." },
+        { no: 28, tipe: "ISIAN", teks: "Seseorang yang telah meninggal dunia berada di alam pembatas antara dunia dan akhirat. Alam ini disebut sebagai alam ..." },
+        { no: 29, tipe: "ISIAN", teks: "Istilah untuk amalan kebaikan yang pahalanya akan terus mengalir kepada seseorang meskipun ia telah meninggal dunia dan berada di alam kubur adalah ..." },
+
+        // PILIHAN GANDA BAB 3 (ETIKA KOMUNIKASI)
+        { no: 30, tipe: "PG", teks: "Prinsip komunikasi Islami yang menekankan penyampaian perkataan yang benar, jujur, serta sesuai dengan fakta tanpa ada unsur kebohongan disebut ...", opsi: ["A. Qaulan Ma'rufan", "B. Qaulan Sadidan", "C. Qaulan Layyinan", "D. Qaulan Balighan"], kunci: "B" },
+        { no: 31, tipe: "PG", teks: "Perbuatan membicarakan keburukan atau aib orang lain di belakangnya yang tidak disukai oleh orang tersebut dinamakan ...", opsi: ["A. Namimah", "B. Ghibah", "C. Fitnah", "D. Hasad"], kunci: "B" },
+        { no: 32, tipe: "PG", teks: "Nabi Musa a.s. dan Nabi Harun a.s. diperintahkan oleh Allah SWT untuk berbicara kepada Firaun dengan perkataan yang lemah lembut. Prinsip komunikasi tersebut menerapkan ajaran ...", opsi: ["A. Qaulan Layyinan", "B. Qaulan Sadidan", "C. Qaulan Kariman", "D. Qaulan Maysura"], kunci: "A" },
+        { no: 33, tipe: "PG", teks: "Ketika seseorang menerima pesan di grup WhatsApp yang belum jelas kebenarannya, tindakan yang paling sesuai dengan prinsip tabayyun (QS. Al-Hujurat: 6) adalah ...", opsi: ["A. Membagikannya langsung ke grup lain agar teman-teman waspada", "B. Mengkritik pengirim pesan secara langsung di ruang publik", "C. Meneliti dan mengonfirmasi kebenaran informasi sebelum membagikannya", "D. Menghapus akun media sosial agar tidak terpengaruh hoaks"], kunci: "C" },
+        { no: 34, tipe: "PG", teks: "Di sebuah grup media sosial, seorang siswa membagikan foto temannya yang sedang tertidur dengan gaya lucu tanpa izin hingga memicu ejekan. Tindakan tersebut melanggar prinsip ...", opsi: ["A. Menjaga kerahasiaan negara", "B. Hifzhul 'Irdh (menjaga kehormatan dan martabat sesama)", "C. Saling menasihati dalam hal kekayaan", "D. Menerapkan kebebasan berekspresi tanpa batas"], kunci: "B" },
+        { no: 35, tipe: "PG", teks: "Rian merasa iri melihat temannya mengunggah barang mewah di media sosial, lalu ia menuliskan komentar sindiran pedas yang memprovokasi teman-temannya. Perilaku Rian mencakup dua perbuatan tercela yaitu ...", opsi: ["A. Riya' dan Takabbur", "B. Hasad dan Namimah (adu domba)", "C. Nifak dan Khianat", "D. Israf dan Tabzir"], kunci: "B" },
+        { no: 36, tipe: "PG", teks: "Siti melihat unggahan temannya yang memuat kekeliruan pendapat agama di media sosial. Langkah terbaik Siti yang mencerminkan Qaulan Kariman adalah ...", opsi: ["A. Mengomentari unggahan tersebut secara terbuka dengan bahasa kasar", "B. Mengirimkan pesan pribadi (Direct Message) dengan bahasa santun", "C. Membuat unggahan balasan yang menyerang kepribadian temannya", "D. Mengabaikan kekeliruan tersebut karena bukan urusannya"], kunci: "B" },
+
+        // PILIHAN GANDA KOMPLEKS (BAB 3)
+        { no: 37, tipe: "PGK", teks: "Manakah di antara pernyataan berikut yang merupakan etika Islami dalam bergaul dengan teman sebaya di sekolah? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Saling menghormati dan tidak memanggil dengan julukan yang buruk (nabaz)", "B. Tolong-menolong dalam mengerjakan soal ujian sekolah", "C. Menjaga rahasia dan aib pribadi teman", "D. Menjauhi pergaulan bebas dan perbuatan yang mendekati zina", "E. Mendorong teman untuk membalas dendam jika disakiti"], kunci: ["A", "C", "D"] },
+        { no: 38, tipe: "PGK", teks: "Manakah yang merupakan ciri-ciri atau dampak perbuatan Namimah (adu domba)? <i>(Pilih lebih dari satu)</i>", opsi: ["A. Menyebarkan perkataan seseorang kepada orang lain dengan tujuan merusak hubungan", "B. Menyebabkan permusuhan dan hilangnya rasa saling percaya antar sesama", "C. Meneliti kebenaran berita sebelum membagikannya di ruang publik", "D. Diancam tidak akan masuk surga sebagaimana disebutkan dalam hadits Nabi SAW", "E. Menjadi sarana untuk menyatukan dua kelompok yang berselisih"], kunci: ["A", "B", "D"] },
+        { no: 39, tipe: "PGK", teks: "Sikap seorang muslim yang sesuai ajaran Al-Qur'an dalam menyikapi fenomena Cyberbullying dan Hate Speech adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Menghindari berkomentar kasar meskipun tidak menyukai konten seseorang", "B. Ikut meramaikan komentar negatif agar terlihat solid", "C. Menggunakan fitur laporkan (report) atau blokir pada konten fitnah", "D. Mengontrol emosi dan membalas keburukan dengan cara yang lebih baik (ihsan)", "E. Membagikan ulang unggahan kebohongan demi menambah followers"], kunci: ["A", "C", "D"] },
+        { no: 40, tipe: "PGK", teks: "Sikap berkomunikasi di media sosial yang sesuai dengan ajaran Islam adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Budaya Tabayyun sangat penting untuk mencegah penyebaran berita bohong (hoaks)", "B. Etika digital seorang muslim tidak diawasi oleh Allah", "C. Setiap ketikan dan komentar jari tangan akan dimintai pertanggungjawaban kelak", "D. Bebas menyebarkan konten apa saja selama tidak ketahuan oleh guru/orang tua", "E. Menyaring informasi (saring sebelum sharing) adalah wujud keimanan"], kunci: ["A", "C", "E"] },
+        { no: 41, tipe: "PGK", teks: "Contoh penerapan prinsip Qaulan Sadidan (perkataan yang benar/jujur) dalam kehidupan sehari-hari adalah ... <i>(Pilih lebih dari satu)</i>", opsi: ["A. Berani berkata jujur saat menjadi saksi suatu kejadian tanpa memihak", "B. Menyampaikan informasi dengan menambahkan karangan agar lebih menarik", "C. Mengakui kesalahan diri sendiri tanpa mencari alasan", "D. Menolak untuk menyebarkan berita hoaks atau fitnah di media sosial", "E. Pura-pura tidak tahu ketika melihat teman membutuhkan pertolongan"], kunci: ["A", "C", "D"] },
+
+        // ISIAN SINGKAT (BAB 3)
+        { no: 42, tipe: "ISIAN", teks: "Menuduh orang lain melakukan perbuatan buruk tanpa adanya bukti yang sah dan benar dinamakan ..." },
+        { no: 43, tipe: "ISIAN", teks: "Sikap saling mengenal, memahami, dan menghargai keberagaman dalam pergaulan sesama manusia sesuai QS. Al-Hujurat ayat 13 disebut ..." },
+
+        // ESSAY / URAIAN
+        { no: 44, tipe: "ESSAY", teks: "Analisislah bagaimana nilai-nilai Etika Pergaulan dan Komunikasi Islami dapat dijadikan panduan moral untuk menciptakan iklim pergaulan yang sehat! Berikan minimal 3 (tiga) contoh langkah konkret yang dapat diterapkan remaja saat berinteraksi di media sosial!" },
+        { no: 45, tipe: "ESSAY", teks: "Analisislah bagaimana generasi muda pelajar saat ini dapat meneladani etos kerja dan etos belajar para ilmuwan Muslim (seperti Ibnu Sina, Al-Khawarizmi, dll.) di era digital! Berikan minimal 3 (tiga) contoh langkah konkret yang dapat diterapkan dalam kegiatan belajar sehari-hari!" }
+    ];
+
+    let dataSiswa = { nama: "", kelas: "" };
+    let pelanggaran = 0;
+    let waktuSisa = 70 * 60; // 70 Menit
+    let timerInterval;
+    let ujianAktif = false;
+
+    // 1. MULAI UJIAN
+    function mulaiUjian() {
+        const namaInput = document.getElementById("inputNama");
+        const kelasInput = document.getElementById("inputKelas");
+
+        const nama = namaInput ? namaInput.value.trim() : "";
+        const kelas = kelasInput ? kelasInput.value.trim() : "";
+
+        if (!nama || !kelas) {
+            alert("Harap isi Nama Lengkap dan Kelas terlebih dahulu!");
+            return;
+        }
+
+        dataSiswa.nama = nama;
+        dataSiswa.kelas = kelas;
+
+        // Pindah Tampilan Halaman
+        document.getElementById("page-register").style.display = "none";
+        document.getElementById("page-ujian").style.display = "block";
+
+        renderSoal();
+        aktifkanSistemKeamanan();
+        mulaiTimer();
+        ujianAktif = true;
+
+        // Minta Fullscreen secara aman tanpa membuat app crash jika diblokir
+        mintaFullscreenAman();
+    }
+
+    // 2. RENDER SOAL
+    function renderSoal() {
+        const container = document.getElementById("soal-container");
+        container.innerHTML = "";
+
+        bankSoal.forEach((s, idx) => {
+            let badgeText = "Pilihan Ganda";
+            if(s.tipe === "PGK") badgeText = "Pilih Lebih Dari Satu";
+            else if(s.tipe === "ISIAN") badgeText = "Isian Singkat";
+            else if(s.tipe === "ESSAY") badgeText = "Uraian / Essay";
+
+            let inputHtml = "";
+
+            if (s.tipe === "PG") {
+                inputHtml = `<ul class="opsi-list">
+                    ${s.opsi.map((o, oIdx) => {
+                        const kode = String.fromCharCode(65 + oIdx);
+                        return `
+                            <li class="opsi-item">
+                                <label class="opsi-label">
+                                    <input type="radio" name="soal_${idx}" value="${kode}">
+                                    ${o}
+                                </label>
+                            </li>
+                        `;
+                    }).join('')}
+                </ul>`;
+            } else if (s.tipe === "PGK") {
+                inputHtml = `<ul class="opsi-list">
+                    ${s.opsi.map((o, oIdx) => {
+                        const kode = String.fromCharCode(65 + oIdx);
+                        return `
+                            <li class="opsi-item">
+                                <label class="opsi-label">
+                                    <input type="checkbox" name="soal_${idx}" value="${kode}">
+                                    ${o}
+                                </label>
+                            </li>
+                        `;
+                    }).join('')}
+                </ul>`;
+            } else if (s.tipe === "ISIAN") {
+                inputHtml = `<input type="text" name="soal_${idx}" placeholder="Ketik jawaban singkat di sini...">`;
+            } else if (s.tipe === "ESSAY") {
+                inputHtml = `<textarea name="soal_${idx}" placeholder="Ketik jawaban uraian secara lengkap di sini..."></textarea>`;
+            }
+
+            const card = `
+                <div class="soal-card">
+                    <span class="badge">${badgeText}</span>
+                    <div class="soal-text"><strong>Soal ${s.no}.</strong> ${s.teks}</div>
+                    ${inputHtml}
+                </div>
+            `;
+            container.innerHTML += card;
+        });
+    }
+
+    // 3. TIMER
+    function mulaiTimer() {
+        timerInterval = setInterval(() => {
+            waktuSisa--;
+            let m = Math.floor(waktuSisa / 60);
+            let s = waktuSisa % 60;
+            document.getElementById("timer").innerText = `${m < 10 ? '0':''}${m}:${s < 10 ? '0':''}${s}`;
+
+            if (waktuSisa <= 0) {
+                clearInterval(timerInterval);
+                kirimJawaban("Selesai (Waktu Habis)");
+            }
+        }, 1000);
+    }
+
+    // 4. FITUR KEAMANAN
+    function aktifkanSistemKeamanan() {
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden && ujianAktif) {
+                catatPelanggaran("Anda terdeteksi keluar dari browser / berpindah tab!");
+            }
+        });
+
+        document.addEventListener("fullscreenchange", () => {
+            if (!document.fullscreenElement && ujianAktif) {
+                catatPelanggaran("Anda keluar dari mode Layar Penuh (Fullscreen)!");
+            }
+        });
+
+        document.addEventListener("contextmenu", e => e.preventDefault());
+        document.addEventListener("copy", e => e.preventDefault());
+        document.addEventListener("cut", e => e.preventDefault());
+        document.addEventListener("paste", e => e.preventDefault());
+    }
+
+    function mintaFullscreenAman() {
+        try {
+            let elem = document.documentElement;
+            if (elem.requestFullscreen) { elem.requestFullscreen().catch(()=>{}); }
+            else if (elem.webkitRequestFullscreen) { elem.webkitRequestFullscreen().catch(()=>{}); }
+        } catch(e) {
+            // Abaikan jika browser tidak mendukung atau menolak mode Fullscreen
+        }
+    }
+
+    function catatPelanggaran(alasan) {
+        pelanggaran++;
+        document.getElementById("violation-count").innerText = `${pelanggaran}/3`;
+        document.getElementById("modalMsg").innerText = alasan;
+        document.getElementById("warningModal").style.display = "flex";
+
+        if (pelanggaran >= 3) {
+            tutupModal();
+            kirimJawaban("DISKUALIFIKASI");
+        }
+    }
+
+    function tutupModal() {
+        document.getElementById("warningModal").style.display = "none";
+        if (ujianAktif && !document.fullscreenElement) {
+            mintaFullscreenAman();
+        }
+    }
+
+    function konfirmasiSelesai() {
+        if (confirm("Apakah Anda yakin ingin menyelesaikan dan mengirim jawaban ujian?")) {
+            kirimJawaban("Selesai");
+        }
+    }
+
+// 5. PENGHITUNGAN & PENGIRIMAN DATA (TERMASUK ISIAN & ESSAY)
+    function kirimJawaban(statusUjian) {
+        ujianAktif = false;
+        clearInterval(timerInterval);
+
+        document.getElementById("page-ujian").style.display = "none";
+        document.getElementById("page-selesai").style.display = "block";
+
+        let skorPg = 0;
+        let totalSoalObjektif = 0;
+        let rekapIsianDanEssay = [];
+
+        bankSoal.forEach((s, idx) => {
+            if (s.tipe === "PG") {
+                totalSoalObjektif++;
+                const selected = document.querySelector(`input[name="soal_${idx}"]:checked`);
+                if (selected && selected.value === s.kunci) {
+                    skorPg++;
+                }
+            } else if (s.tipe === "PGK") {
+                totalSoalObjektif++;
+                const selected = Array.from(document.querySelectorAll(`input[name="soal_${idx}"]:checked`)).map(cb => cb.value);
+                const k = s.kunci;
+                if (selected.length === k.length && selected.every(val => k.includes(val))) {
+                    skorPg++;
+                }
+            } else if (s.tipe === "ISIAN" || s.tipe === "ESSAY") {
+                // Ambil jawaban teks dari input / textarea
+                const inputElem = document.querySelector(`[name="soal_${idx}"]`);
+                const teksJawaban = inputElem ? inputElem.value.trim() : "";
+                rekapIsianDanEssay.push(`Soal ${s.no}: ${teksJawaban || "(Kosong)"}`);
+            }
+        });
+
+        let nilaiCalculated = Math.round((skorPg / totalSoalObjektif) * 100);
+
+        const payload = {
+            nama: dataSiswa.nama,
+            kelas: dataSiswa.kelas,
+            nilai: nilaiCalculated,
+            detailJawaban: rekapIsianDanEssay.join(" | \n"), // Menggabungkan seluruh jawaban teks
+            pelanggaran: pelanggaran,
+            status: statusUjian
+        };
+
+        // Jeda acak (0 - 5 detik) untuk keamanan trafik 300 siswa
+        const randomDelay = Math.floor(Math.random() * 5000);
+
+        setTimeout(() => {
+            fetch(SCRIPT_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            })
+            .then(() => {
+                document.getElementById("status-title").innerText = "✅ Jawaban Terkirim!";
+                document.getElementById("status-desc").innerHTML = `
+                    Terima kasih, <strong>${dataSiswa.nama}</strong>.<br>
+                    Jawaban Anda telah berhasil tersimpan di sistem.
+                `;
+            })
+            .catch(err => {
+                document.getElementById("status-title").innerText = "❌ Gagal Mengirim Data";
+                document.getElementById("status-desc").innerText = "Terjadi kesalahan koneksi. Harap laporkan ke guru pengawas.";
+            });
+        }, randomDelay);
+    }
+</script>
+
+</body>
+</html>
